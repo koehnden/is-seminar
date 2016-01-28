@@ -143,9 +143,9 @@ toy.data <- function(n=200,p=100,balance=0.6,strong.corr=0.7){
 
 ### set up different data sets
 set.seed(12345)
-toy.data1 <- toy.data(n=200,p=100)  # normal structure
-toy.data2 <- toy.data(n=500,p=200)  # easy
-toy.data3 <- toy.data(n=200,p=500)  # p>>n 
+toy.data1 <- toy.data(n=500,p=200)  # normal structure
+toy.data2 <- toy.data(n=500,p=500)  # easy
+toy.data3 <- toy.data(n=100,p=500)  # p>>n 
 
 ################################ Monk 3 #########################################
 #
