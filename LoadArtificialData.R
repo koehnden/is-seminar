@@ -91,6 +91,7 @@ ifelse(is.even(row_sum)==TRUE,0,1)==parity[,11] # ifelse result equal target var
 #
 ## permute the rows of the relevant feature randomly holding the sum of each row 
 #  fixed so that the psrity of the new 5 feature still predict the target perfectly 
+#  use permatswap from the vegan package
 permute.rowsum_fixed <- permatswap(as.matrix(f_relevant), times = 100, mtype = "prab", 
                   fixedmar="both")
 # create redundant
@@ -100,10 +101,7 @@ f_redundant <- permute.rowsum_fixed$perm[[2]]
 # merge everything
 parity <- data.frame(parity,f_redudant)
 
-
 ######################### Toy Data Sets ####################################
-#
-# TODO: Read the Paper again and Simulate the data using replicate
 #
 # dealing with noise (instead of LED-Data)
 # additionally we add weakly important features
@@ -112,44 +110,42 @@ parity <- data.frame(parity,f_redudant)
 # used in Weston et al. (2003) to test FS for SVM and 
 # in Genauer et al. (2010) to test Random Forrest Variable Importance
 # cite both papers!
-#
-n <- 200 # number of observation
-p <- 100 # number of features
-## we could vary n and p to make FS harder (easier)
 
-## create target variable
-# coded as 1 and -1 (can be changed after features are created)
-set.seed(12345)
-balance <- 0.6 # can also be changed towards more (un)balanced
-target <- rbinom(n, size=1, prob=balance)
-target[target==0] <- -1
-
-#### create high relevant features eg. strong correlation with the target
-# 70% percent of the datapoints in the features is correlated with the target 
-# and 30% is noise
-f_strong <- matrix(rep(0,n*3),n,3)
-for(i in 1:3){
-  f_strong[,i] <- c(rnorm(n*0.7,mean=target*i,sd=1),rnorm(n*0.3,mean=0,sd=1))
+toy.data <- function(n=200,p=100,balance=0.6,strong.corr=0.7){
+  target <- rbinom(n, size=1, prob=balance)
+  target[target==0] <- -1
+  
+  #### create high relevant features eg. strong correlation with the target
+  # 70% (strong.corr) percent of the datapoints in the features is correlated 
+  # with the target and 30% (1-strong.corr) is noise
+  f_strong <- matrix(rep(0,n*3),n,3)
+  for(i in 1:3){
+    f_strong[,i] <- c(rnorm(n*strong.corr,mean=target*i,sd=1),
+                      rnorm(n*(1-strong.corr),mean=0,sd=1))
+  }
+  
+  #### create weak relevant features eg. weakly correlation with target  
+  # 30% (1-strong.corr) percent of the datapoints in the features is correlated 
+  # with the target and 70% is noise 
+  f_weak <- matrix(rep(0,n*3),n,3)
+  for(i in 1:3){
+    f_weak[,i] <- c(rnorm(n*(1-strong.corr),mean=target*i,sd=1),
+                    rnorm(n*strong.corr,mean=0,sd=1))
+  }
+  
+  #### create noise 
+  f_noise <- replicate(p-6, rnorm(n,mean=0,sd=1))
+  
+  ### combining the data
+  toy.data <- data.frame(f_strong,f_weak,f_noise,target)
+  return(toy.data)
 }
-#cor(f_strong[,3],target) # 0.7599
 
-#### create weak relevant features eg. weakly correlation with target  
-# 30% percent of the datapoints in the features is correlated with the target 
-# and 70% is noise 
+### set up different data sets
 set.seed(12345)
-f_weak <- matrix(rep(0,n*3),n,3)
-for(i in 1:3){
-  f_weak[,i] <- c(rnorm(n*0.3,mean=target*i,sd=1),rnorm(n*0.7,mean=0,sd=1))
-}
-#cor(f_weak[,3],target) # 0.4747
-## we could vary ratio between correlation and noise to make FS harder (easier) 
-
-#### create noise 
-f_noise <- replicate(p-6, rnorm(n,mean=0,sd=1))
-
-### combining the data
-toy.data <- data.frame(y,x_strong, x_weak, x_noise)
-# maybe try out other combination of the parameter
+toy.data1 <- toy.data(n=200,p=100)  # normal structure
+toy.data2 <- toy.data(n=500,p=200)  # easy
+toy.data3 <- toy.data(n=200,p=500)  # p>>n 
 
 ################################ Monk 3 #########################################
 #
