@@ -207,8 +207,8 @@ colnames(madelon) <- c(1:500,"target")
 # mean(madelon[,"target"]==1)  # 0.5 
 
 ###### remove all unneccessary objects #####################################
-rm(f_irrelevant, f_noise, check.parity, f_redundant, f_relevant, f_strong, f_weak,
-   madelon.tr,madelon.tr_labels, madelon.val, madelon.val_labels, target, train.id,
+rm(f_irrelevant, f_noise, check.parity, f_redundant, f_relevant,madelon.tr,
+   madelon.tr_labels, madelon.val, madelon.val_labels, target, train.id,
    f1, f2, i, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
 
 
