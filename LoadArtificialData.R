@@ -2,6 +2,9 @@
 #
 # create Artificial Data Sets and loads them
 #
+# requires a working directory with the data set (google drive) and
+# the packages loaded in LoadPackages
+#
 ############################## Artifical Data Sets ###############################
 #
 # see Bolon-Canedo et al. (2011)
@@ -29,11 +32,10 @@ cor(corral[,5],corral[,7])
 #### create 93 other irrelevant features to obtain Corral-100
 # Kim et al. (2010): An MLP-based feature subset selection for HIV-1 protease cleavage site analysis
 #
-# we use sample() and the irrelevant feature 5 to generate the irrelevant features
-# and repeat the random sampling 93 using replicate() 
-set.seed(12345)
-Sample.Irrelevant <- function(x) sample(x,replace=F)
-f_irrelevant <- replicate(93,Sample.Irrelevant(corral[,5]))
+# we use sample() to generate the irrelevant features and repeat 
+# the random sampling 93 using replicate() 
+set.seed(123)
+f_irrelevant <- replicate(93,sample(c(1,0),128, replace=T))
 # merge to get corral-100
 corral_100 <- data.frame(corral,f_irrelevant)
 
@@ -42,7 +44,7 @@ corral_100 <- data.frame(corral,f_irrelevant)
 # dealing with nolinearity and interaction (only the subset matters)
 #
 #### randomly generate binary variables from a bernoulli distribution
-set.seed(1010101)
+set.seed(1234)
 f1 <- rbinom(n=50,size=1,prob=0.5)
 f2 <- rbinom(n=50,size=1,prob=0.5)
 
@@ -52,8 +54,8 @@ target <- ifelse(f1==f2,0,1)
 xor <- data.frame(target,f1,f2)
 
 ## randomly generate 97 irrelevate features
-set.seed(1010101)
-f_irrelevant <- replicate(97,Sample.Irrelevant(x= rbinom(n=50,size=1,prob=0.5)))
+set.seed(12345)
+f_irrelevant <- replicate(97,sample(c(1,0),nrow(xor), replace=T))
 xor_100 <- data.frame(xor,f_irrelevant)
 
 # baseline accurary like in Bolon-Canedo et al. (2011)
@@ -79,7 +81,7 @@ colnames(parity) <- c("f1_irr", "f2_rel", "f3_rel" , "f4_rel", "f5_irr",
                      "f6_rel", "f7_irr","f8_rel", "f9_irr", "f10_irr", "target")  
 ### code to check parity
 f_relevant <- parity[,c(2,3,4,6,8)]
-#row_sum <- apply(f_relevant,1,sum)
+row_sum <- apply(f_relevant,1,sum)
 ## modulo division to find out if a number is even
 is.even <- function(x) x %% 2 == 0 
 ifelse(is.even(row_sum)==TRUE,0,1)==parity[,11] # ifelse result equal target variable 
@@ -92,14 +94,14 @@ ifelse(is.even(row_sum)==TRUE,0,1)==parity[,11] # ifelse result equal target var
 ## permute the rows of the relevant feature randomly holding the sum of each row 
 #  fixed so that the psrity of the new 5 feature still predict the target perfectly 
 #  use permatswap from the vegan package
-permute.rowsum_fixed <- permatswap(as.matrix(f_relevant), times = 100, mtype = "prab", 
-                  fixedmar="both")
+permute.rowsum_fixed <- permatswap(as.matrix(f_relevant), times = 100, 
+                                   mtype = "prab", fixedmar="both")
 # create redundant
 f_redundant <- permute.rowsum_fixed$perm[[2]]
 #row_sum <- apply(f_redundant,1,sum) # to check if it work use the row sums and
                                      # execute the code to above to check parity 
 # merge everything
-parity <- data.frame(parity,f_redudant)
+parity <- data.frame(parity,f_redundant)
 
 ######################### Toy Data Sets ####################################
 #
@@ -174,9 +176,9 @@ monk.test <- monk[-idx.tr,]
 ## names columns
 # features f2, f3, f5 are relevant, but selecting only f2 and f5 can lead to better
 # classification result (see John & Kohavi, 1997)
-col.monk <- c("target", "f1_irr", "f2_rel", "f3_rel" , "f4_irr", 
-                       "f5_rel", "f6_rel", "id")
-colnames(monk.tr) <- colnames(monk.test) <- col.monk
+col.monk <- c("target", "f1_irr", "f2_rel", "f3_irr" , "f4_rel", 
+                       "f5_rel", "f6_irr", "id")
+colnames(monk.tr) <- colnames(monk.test) <- colnames(monk) <- col.monk
 
 ############################ MADELON ###########################################
 #
@@ -207,9 +209,9 @@ colnames(madelon) <- c(1:500,"target")
 # mean(madelon[,"target"]==1)  # 0.5 
 
 ###### remove all unneccessary objects #####################################
-rm(f_irrelevant, f_noise, check.parity, f_redundant, f_relevant,madelon.tr,
-   madelon.tr_labels, madelon.val, madelon.val_labels, target, train.id,
-   f1, f2, i, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
-
+rm(f_irrelevant, check.parity, f_redundant, f_relevant,madelon.tr,
+   madelon.tr_labels, madelon.val, madelon.val_labels, target,
+   f1, f2, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
+#
 
 
