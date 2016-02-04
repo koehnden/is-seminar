@@ -171,6 +171,7 @@ monk.tr <- monk.tr[,-1]
 ### get the test set without noise in the target with 310 instances
 # %in% to compare vectors with different length
 idx.tr <- which(monk[,8] %in% monk.tr[,8]) 
+monk.test <- monk[-idx.tr,]
 
 ## names columns
 # features f2, f3, f5 are relevant, but selecting only f2 and f5 can lead to better
@@ -208,9 +209,9 @@ colnames(madelon) <- c(1:500,"target")
 # mean(madelon[,"target"]==1)  # 0.5 
 
 ###### remove all unneccessary objects #####################################
-rm(f_irrelevant, check.parity, f_redundant, f_relevant,madelon.tr,
+rm(f_irrelevant, f_redundant, f_relevant,madelon.tr,
    madelon.tr_labels, madelon.val, madelon.val_labels, target,
    f1, f2, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
-#
+
 
 
