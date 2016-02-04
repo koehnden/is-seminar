@@ -13,7 +13,7 @@
 # Calculates IW = 1 + I(F_i;F_j;C)/H(F_i) + H(F_i)
 # where a H(X) is the entropy function of X and I(X;Y;Z) is the interaction gain 
 # of three random variables X, Y and Z
-## The function needs the following inputs
+## The function needs the following input
 # x - feature i
 # y - feature j 
 # target - target variable of the classification problem
@@ -36,17 +36,18 @@ IW <- function(x,y,target){
 ## The function needs the following inputs
 # target - target variable
 # feature - features without target variable
-# K - number of feature to be choosen 
+# K - maximum number of feature to be choosen 
+#     (note: K must be K < # of total features!!!) 
 # colnames - a boolean to derminate wether column names are provided or not
-# minfo.criteria - a boolean wether to stop the algorithm if I(F,C)=I(F_Subset;C)
-#                  is satisfied
+# minfo.criteria - a boolean wether to stop the algorithm if 
+#                  I(F,C)*percent.info=I(F_Subset;C) is satisfied
+# percent.info - percentage of total information gain that determines the stopping 
+#                criteria
 ## output: a vector of the feature names choosen by the algorithm or an index if 
 #          column names are not provided
 
-## TODO minfo.criteria=T does not work (I(F,C)=I(F_Subset;C) rule)  
 iwfs <- function(target, features, K=NA, colnames=TRUE,
-                 minfo.criteria=FALSE){
-  
+                 minfo.criteria=FALSE, percent.info=0.75){  
   C <- target
   allFeatures <- features
     
@@ -58,27 +59,32 @@ iwfs <- function(target, features, K=NA, colnames=TRUE,
   # Calculate Symmetrical Uncertainty using symmetrical.uncertainty() function
   # from the FSelector packages
   df <- data.frame(C,candidateFeatures)
-  SU <- symmetrical.uncertainty(C~.,data=df)
+  SU <- symmetrical.uncertainty(C~.,data=df); SUfull <- SU
   
   ### calulate the Relevance measure with all features for the first round
   adjR <- weights * (1 + SU) # weight adjusted Relevance Measure
-  if(colnames==FALSE){rownames(adjR) <- NULL} # in case no column names are provided
-  choosenFeature <- cutoff.k(adjR,k=1) # choose the bset feature
-  idx.new <- which(names(allFeatures) %in% choosenFeature) # index of the choosen feature
+  # in case no column names are provided
+  if(colnames==FALSE){
+    rownames(adjR) <- NULL
+    choosenFeature <- cutoff.k(adjR,k=1) # choose the bset feature
+    idx.new <- as.numeric(choosenFeature) # index of the choosen feature
+    } else {
+      choosenFeature <- cutoff.k(adjR,k=1) # choose the bset feature
+      idx.new <- which(names(allFeatures) %in% choosenFeature) # index of the choosen feature
+    }#end if else 
   
   ### exclude selected feature out of the candidate Features
   candidateFeatures <- candidateFeatures[,-idx.new]
   ###### end First Round
   
   ### Round 2 to K
-  if(minfo.criteria==T){
-    infoFull <- multiinformation(data.frame(features,target), method ="emp") 
-  }
-  K <- K    
+  infoFull <- multiinformation(data.frame(features,target), method ="emp") 
+  K <- K     
   k <- 1
   while(k < K){
     ### update weights
-    update.weights <- c(rep(0,length(candidateFeatures))) 
+    #print(ncol(candidateFeatures))
+    update.weights <- c(rep(0,ncol(candidateFeatures))) 
     for(i in 1:ncol(candidateFeatures)){                  
       update.weights[i] <- IW(candidateFeatures[,i],
                               features[,idx.new], C)
@@ -87,12 +93,11 @@ iwfs <- function(target, features, K=NA, colnames=TRUE,
     
     ### Calculate Relevance Measure
     if(colnames==FALSE){rownames(SU) <- NULL}
-    SU <-  subset(SU,rownames(SU) %in% colnames(candidateFeatures))### ERROR HERE!!!   
+    SU <-  subset(SU,rownames(SU) %in% colnames(candidateFeatures))   
     adjR <- weights * (1 + SU)
-    print(length(SU$attr_importance))
 
-    ### choose the the feature with the largest Relevance Measur
-    choosenNew <- cutoff.k(adjR,k=1) #ERROR probably happens here
+    ### choose the the feature with the largest Relevance Measure (adjR)
+    choosenNew <- cutoff.k(adjR,k=1)  
     choosenFeature <- append(choosenFeature,choosenNew, after=k)
     idx.new <- which(names(candidateFeatures) %in% choosenFeature)
     
@@ -103,23 +108,41 @@ iwfs <- function(target, features, K=NA, colnames=TRUE,
       infoSubset <- multiinformation(data.frame(features[,choosenFeature],target),
                              method ="emp")
     }#end if  
-    if(minfo.criteria==TRUE & infoSubset >= infoFull*0.75){
+    if(minfo.criteria==TRUE & infoSubset >= infoFull*percent.info){
       break
     }
     k <- k + 1
   }#end while
 
   ## return the feature that are choosen
-  if(colnames==FALSE){ return(as.numeric(choosenFeature))}
-  return(choosenFeature)
+  if(colnames==FALSE){ 
+    return(list(selected.features=as.numeric(choosenFeature),
+                symmetrical.uncertainty=SUfull))
+  }
+  return(list(selected.features=choosenFeature,
+              symmetrical.uncertainty=SUfull))
 }#end iwfs
 
+################# some tests for the iwfs function ################################
+# 
+# note: Error in rep(0, ncol(candidateFeatures)) : invalid 'times' argument probably
+#       means that the maximum number of selected features is too high e.g.
+#       K >= # of features in the full set
 
-iwfs.corral <- iwfs(target=corral_100[,7],features=corral_100[,-7],
-                  K=98, minfo.criteria=T, colnames=FALSE)
+## test on the corral data
+#iwfs.corral <- iwfs(target=corral[,7],features=corral[,-7],
+#                  K=4, minfo.criteria=T, colnames=T)
+## get the feature subset
+iwfs.corral$selected.features 
+# note that iwfs works not well with corral and xor because the SU fails (univariate Filter)
+## corral: SU=0 for all features except 6
+## xor: SU=0 for all feature
 
-iwfs.monk <- iwfs(target=monk[,"target"], features=monk[,-c(1,8)],
-                    K=14, minfo.criteria=T)
+## test on monk3 data
+#iwfs.monk <- iwfs(target=monk.tr[,"target"], features=monk.tr[,-c(1,8)],
+#                    K=5, minfo.criteria=T)
 
-iwfs.madelon <- iwfs(target=madelon[,"target"], features=madelon[,-501],
-                    K=5, minfo.criteria=T, colnames=FALSE)
+## test on madelon 
+# takes about 5min
+#iwfs.madelon <- iwfs(target=madelon[,"target"], features=madelon[,-501],
+#                    K=54, minfo.criteria=T, colnames=FALSE)
