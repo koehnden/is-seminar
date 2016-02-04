@@ -153,7 +153,7 @@ toy.data3 <- toy.data(n=100,p=500)  # p>>n
 #
 # see description: https://archive.ics.uci.edu/ml/machine-learning-databases/monks-problems/monks.names
 # dealing with noise in the target
-# target: (f5 = 3 and f4 = 1) or (f5 /= 4 and f2 /= 3)
+# target: (f5 = 3 and f4 = 1) or (f5 != 4 and f2 != 3) then 1 and 0 otherwise
 # (5% class noise added to the training set)
 # note: Bolon-Canedo use only the training data (122 instances), 
 
@@ -171,7 +171,6 @@ monk.tr <- monk.tr[,-1]
 ### get the test set without noise in the target with 310 instances
 # %in% to compare vectors with different length
 idx.tr <- which(monk[,8] %in% monk.tr[,8]) 
-monk.test <- monk[-idx.tr,]
 
 ## names columns
 # features f2, f3, f5 are relevant, but selecting only f2 and f5 can lead to better
