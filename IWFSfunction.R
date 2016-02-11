@@ -133,7 +133,7 @@ iwfs <- function(target, features, K=NA, colnames=TRUE,
 #iwfs.corral <- iwfs(target=corral[,7],features=corral[,-7],
 #                  K=4, minfo.criteria=T, colnames=T)
 ## get the feature subset
-iwfs.corral$selected.features 
+#iwfs.corral$selected.features 
 # note that iwfs works not well with corral and xor because the SU fails (univariate Filter)
 ## corral: SU=0 for all features except 6
 ## xor: SU=0 for all feature
