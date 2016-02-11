@@ -37,16 +37,20 @@ cor(corral[,5],corral[,7])
 set.seed(123)
 f_irrelevant <- replicate(93,sample(c(1,0),128, replace=T))
 # merge to get corral-100
-corral_100 <- data.frame(corral,f_irrelevant)
+corral_100 <- data.frame(f_irrelevant,corral)
+
+## Note: Mutual Information and therefore Symmetrical Uncertainty equal zero
+#        for all features except feature f6! Therefore every filter with these
+#        criteria might only be able to select f6 and the rest will be random.
 
 ############### XOR-100 ##################################
 #
 # dealing with nolinearity and interaction (only the subset matters)
 #
 #### randomly generate binary variables from a bernoulli distribution
-set.seed(1234)
-f1 <- rbinom(n=50,size=1,prob=0.5)
-f2 <- rbinom(n=50,size=1,prob=0.5)
+set.seed(12345)
+f1 <- rbinom(n=300,size=1,prob=0.5)
+f2 <- rbinom(n=300,size=1,prob=0.5)
 
 ## creat target using xor operation of the two feature: f1 XOR f2
 #  this mean that target is 1 if f1[i]!=f2[i] and 0 otherwise
@@ -56,11 +60,15 @@ xor <- data.frame(target,f1,f2)
 ## randomly generate 97 irrelevate features
 set.seed(12345)
 f_irrelevant <- replicate(97,sample(c(1,0),nrow(xor), replace=T))
-xor_100 <- data.frame(xor,f_irrelevant)
+xor_100 <- data.frame(f_irrelevant,xor)
 
 # baseline accurary like in Bolon-Canedo et al. (2011)
 1-mean(xor_100[,"target"])
 R_xor <- cor(xor_100) # class-correlation would not work!
+
+## Note: Mutual Information and therefore Symmetrical Uncertainty equal zero
+#        for all features! Therefore every filter with these
+#        criteria will select features random.
 
 
 #################### parity5+5 ###################################################
@@ -113,7 +121,7 @@ parity <- data.frame(parity,f_redundant)
 # in Genauer et al. (2010) to test Random Forrest Variable Importance
 # cite both papers!
 
-toy.data <- function(n=200,p=100,balance=0.6,strong.corr=0.7){
+toy.data <- function(n=200,p=100, balance=0.6,strong.corr=0.7){
   target <- rbinom(n, size=1, prob=balance)
   target[target==0] <- -1
   
@@ -139,15 +147,19 @@ toy.data <- function(n=200,p=100,balance=0.6,strong.corr=0.7){
   f_noise <- replicate(p-6, rnorm(n,mean=0,sd=1))
   
   ### combining the data
-  toy.data <- data.frame(f_strong,f_weak,f_noise,target)
+  toy.data <- data.frame(f_noise,target,f_strong,f_weak)
+  colnames(toy.data) <- c(as.character(1:(p-6)),"target","f1_strong","f2_strong","f3_strong","f4_weak",
+                          "f5_weak", "f6_weak")
   return(toy.data)
 }
 
 ### set up different data sets
 set.seed(12345)
-toy.data1 <- toy.data(n=500,p=200)  # normal structure
-toy.data2 <- toy.data(n=500,p=500)  # easy
-toy.data3 <- toy.data(n=100,p=500)  # p>>n 
+toy.data1 <- toy.data(n=1000,p=200) # normal structure
+toy.data2 <- toy.data(n=1000,p=600) # n=p for the training
+toy.data3 <- toy.data(n=200,p=500)  # p>>n 
+
+# R_relevant <- cor(toy.data1[,(201-6):201])
 
 ################################ Monk 3 #########################################
 #
@@ -212,6 +224,8 @@ colnames(madelon) <- c(1:500,"target")
 rm(f_irrelevant, f_redundant, f_relevant,madelon.tr,
    madelon.tr_labels, madelon.val, madelon.val_labels, target,
    f1, f2, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
+
+
 
 
 
