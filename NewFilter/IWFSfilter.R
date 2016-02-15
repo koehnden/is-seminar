@@ -1,11 +1,15 @@
 ######################### Interaction Weight Feature Selection ########################
 #
-# Zheng et al. (2015)
+## requires InfoTheo and loadPackages 
+source("NewFilter/InfoTheo.R") # to estimate Mututal Information and Symmetrical Uncertainty
+#
+#### Filter proposed by Zheng et al. (2015) 
+#    and almost identical from Sun et al.(2013)
 # Definition Interactive Features: 
 #  A Feature is interactive if it provides more information for the classification 
 #  problem in combination with other features than by itself 
 #                                   
-# Idea to find such features.
+# Idea of the Filter is to find such features.
 # use Symmetical uncertainty plus an interaction weight factor (IWFS)
 # 
 #
@@ -19,30 +23,22 @@
 # target - target variable of the classification problem
 # Note that all inputs must be discrete. So contiuos variables must be discretized first. 
 IW <- function(x,y,target){
-  
-  # compute I(F_i;target;|F_j)
-  I_cond <- condinformation(X=x, Y=y, S=target, 
-                            method="emp")
-  # compute I(F_i;target)
-  I <- mutinformation(X=x, Y=target, method="emp")
-  
-  ## Compute Interaction Gain with I(F_i;F_j;C) = I(F_1;target;|F_2) - I(F_1;target)
-  IG <- I_cond - I
-  # Note that the author of the package infotheo defines the interaction gain exactly
-  # the other way: I(F_i,F_j;C) = I(F_1;target) -I(F_1;target;|F_2) 
+  ## Computation of the Interaction Gain: 
+  # I(F_i;F_j;C) = I(F_i,F_j;C) - I(F_i;C) - I(F_j;C)
+  # Note that the author of the package infotheo defines the interaction gain 
+  # exactly the other way: I(F_i,F_j;C) = I(F_1;target) - I(F_1;target;|F_2) 
   # see my question as crossvalidated: 
   # http://stats.stackexchange.com/questions/194192/computing-the-interaction-gain-is-there-an-error-in-the-infotheo-package-in-r
-  # and the paper Bontempi & Meyer (2010)
-  #IG <- -interinformation(data.frame(x,y,target), method="emp")
-  
+  # and the paper Bontempi & Meyer (2010). 
+  # There we have to take -interinformation()  
   ## Compute Interaction weigth
   # IW(F_i,F_j) = 1 + I(F_i,F_j,C)/H(F_i) + H(F_j)
   # No braces around H(F_i) + H(F_j) in the paper, but then the IW is not beween 0 and 2
-  IW <- 1 +  IG / (entropy(x, method="emp") +
+  IW <- 1 + (-interinformation(data.frame(x,y,target), method="emp"))/ 
+                (entropy(x, method="emp") +
                    entropy(y, method="emp"))
   return(IW)
 }
-
 ################## Function for IWFS #############################
 # 
 ## The function needs the following inputs
@@ -58,35 +54,36 @@ IW <- function(x,y,target){
 ## output: a vector of the feature names choosen by the algorithm or an index if 
 #          column names are not provided
 
-iwfs <- function(target, features, K=NA, colnames=TRUE){  
-  C <- target
+iwfs <- function(target, features, K){  
     
   ######### First Round
   candidateFeatures <- features
   # Initialize weights to 1 for each feature, w(F_i) in the paper
   weights <- c(rep(1,ncol(candidateFeatures)))
   
-  # Calculate Symmetrical Uncertainty using symmetrical.uncertainty() function
-  # from the FSelector packages
-  df <- data.frame(C,candidateFeatures)
-  SU <- symmetrical.uncertainty(C~.,data=df); SUfull <- SU
   
-  # make sure that candidateFeature have the same names as the row in SU
-  # this caused the error "e[[j]] out of bounds" 
-  colnames(candidateFeatures) <- rownames(SU)
+  # calculate the entropy of the target and MI 
+  entropy.target <- entropy(target,method="emp")
+  #### Caculate I(f;C) for all features using the MI.fast() function (InfoTheo)
+  I_fc <- c(rep(0,ncol(features)))
+  for(i in 1:ncol(features)){
+    I_fc[i] <- MI.fast(x=features[,i],y=target,entropy.y=entropy.target)
+  }#end for 
+  
+  # Calculate the symmetrical uncertainty
+  SU <- rep(0,ncol(features))
+  for(i in 1:ncol(features)){
+    SU[i] <- sym.uncertainty.fast(target=target, feature = features[,i],
+                                  MI=I_fc[i],entropy.target)
+  }
+  # make sure that candidateFeature and SU have the same names
+  names(SU) <- colnames(candidateFeatures)
   
   ### calulate the Relevance measure with all features for the first round
-  adjR <- weights * (1 + SU) # weight adjusted Relevance Measure
-  # in case no column names are provided
-  if(colnames==FALSE){
-    #rownames(adjR) <- NULL
-    choosenFeature <- cutoff.k(adjR,k=1) # choose the bset feature
-    idx.new <- as.numeric(choosenFeature) # index of the choosen feature
-    } else {   
-      choosenFeature <- cutoff.k(adjR,k=1) # choose the best feature
-      idx.new <- which(names(candidateFeatures) %in% choosenFeature) # index of the choosen feature       
-    }#end if else 
-  
+  adjR <- weights * (1 + SU) # weight adjusted Relevance Measure  
+  choosenFeatures <- cutoff.k(data.frame(adjR),k=1) # choose the best feature
+  idx.new <- which(colnames(candidateFeatures) %in% choosenFeatures) # index of the choosen feature       
+    
   ### exclude selected feature out of the candidate Features
   candidateFeatures <- candidateFeatures[,-idx.new]
   
@@ -101,19 +98,17 @@ iwfs <- function(target, features, K=NA, colnames=TRUE){
     update.weights <- c(rep(0,ncol(candidateFeatures))) 
     for(i in 1:ncol(candidateFeatures)){                  
       update.weights[i] <- IW(candidateFeatures[,i],
-                              features[,idx.new], C)
+                              features[,idx.new], target)
     }#end for
     weights <- weights[-idx.new] * update.weights 
     
     ### Calculate Relevance Measure
-    if(colnames==FALSE){rownames(SU) <- NULL}
-    SU <-  subset(SU,rownames(SU) %in% colnames(candidateFeatures))
+    SU <- SU[-idx.new]  
     adjR <- weights * (1 + SU)
     
-    ### choose the the feature with the largest Relevance Measure (adjR)
-    choosenNew <- cutoff.k(adjR,k=1)  
-    choosenFeature <- append(choosenFeature,choosenNew, after=k)
-    idx.new <- which(names(candidateFeatures) %in% choosenFeature)
+    ### choose the the feature with the largest Relevance Measure (adjR)  
+    choosenFeatures <- c(choosenFeatures,cutoff.k(data.frame(adjR),k=1))
+    idx.new <- which(names(candidateFeatures) %in% choosenFeatures)
     
     ### exclude selected feature out of the candidate Features
     candidateFeatures <- candidateFeatures[,-idx.new]
@@ -122,35 +117,18 @@ iwfs <- function(target, features, K=NA, colnames=TRUE){
   }#end while
 
   ## return the feature that are choosen
-  if(colnames==FALSE){ 
-    return(list(selected.features=as.numeric(choosenFeature),
-                symmetrical.uncertainty=SUfull))
-  }
-  return(list(selected.features=choosenFeature,
-              symmetrical.uncertainty=SUfull))
+  return(choosenFeatures)
 }#end iwfs
 
 ################# some tests for the iwfs function ################################
 # 
-# note: Error in rep(0, ncol(candidateFeatures)) : invalid 'times' argument probably
-#       means that the maximum number of selected features is too high e.g.
-#       K >= # of features in the full set
-
-## test on the xor
-iwfs.xor <- iwfs(target=xor_100[,"target"],features=xor_100[,-98],
-                  K=10, colnames=T)
+#system.time(iwfs.corral <- iwfs(target=corral_100[,"target"],
+#                                features=corral_100[,-100],K=10))
 ## get the feature subset
-#iwfs.corral$selected.features 
-# note that iwfs works not well with corral and xor because the SU fails (univariate Filter)
-## corral: SU=0 for all features except 6
-## xor: SU=0 for all feature
-
-
+#iwfs.corral 
 ## test on monk3 data
 #iwfs.monk <- iwfs(target=monk.tr[,"target"], features=monk.tr[,-c(1,8)],
 #                    K=3)
-#iwfs.monk$selected.features
-
 ## test on madelon 
 # takes about 5min
 #iwfs.madelon <- iwfs(target=madelon[,"target"], features=madelon[,-501],
