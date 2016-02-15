@@ -1,9 +1,10 @@
 ##################### Artificial Data Sets for IS-Seminar Paper ################
 #
-# create Artificial Data Sets and loads them
-#
-# requires a working directory with the data set (google drive) and
+### creates Artificial Data Sets or/and loads them
 # the packages loaded in LoadPackages
+source("LoadPackages.R")
+# requires a working directory with the data set (google drive) and
+setwd("C:/Users/Dennis/Documents/GitHub/is-seminar/data")
 #
 ############################## Artifical Data Sets ###############################
 #
@@ -45,7 +46,9 @@ corral_100 <- data.frame(f_irrelevant,corral)
 
 ############### XOR-100 ##################################
 #
-# dealing with nolinearity and interaction (only the subset matters)
+# dealing with nolinearity (see Freeman et al (2015) 
+# and interaction (only the subset matters)
+#
 #
 #### randomly generate binary variables from a bernoulli distribution
 set.seed(12345)
@@ -55,7 +58,7 @@ f2 <- rbinom(n=300,size=1,prob=0.5)
 ## creat target using xor operation of the two feature: f1 XOR f2
 #  this mean that target is 1 if f1[i]!=f2[i] and 0 otherwise
 target <- ifelse(f1==f2,0,1)
-xor <- data.frame(target,f1,f2)
+xor <- data.frame(f1,f2,target)
 
 ## randomly generate 97 irrelevate features
 set.seed(12345)
@@ -64,7 +67,7 @@ xor_100 <- data.frame(f_irrelevant,xor)
 
 # baseline accurary like in Bolon-Canedo et al. (2011)
 1-mean(xor_100[,"target"])
-R_xor <- cor(xor_100) # class-correlation would not work!
+#R_xor <- cor(xor_100) # class-correlation would not work!
 
 ## Note: Mutual Information and therefore Symmetrical Uncertainty equal zero
 #        for all features! Therefore every filter with these
@@ -83,10 +86,7 @@ R_xor <- cor(xor_100) # class-correlation would not work!
 # Parity of bits 2,3,4,6,8 (1,5,7,9,10 irrelevant):
 # target = 1 if sum(x_relevant) == uneven and target = 0 otherwise 
 #
-
 parity <- read.table("Parity5+5.txt", header=F, sep=",")
-colnames(parity) <- c("f1_irr", "f2_rel", "f3_rel" , "f4_rel", "f5_irr",
-                     "f6_rel", "f7_irr","f8_rel", "f9_irr", "f10_irr", "target")  
 ### code to check parity
 f_relevant <- parity[,c(2,3,4,6,8)]
 row_sum <- apply(f_relevant,1,sum)
@@ -106,10 +106,24 @@ permute.rowsum_fixed <- permatswap(as.matrix(f_relevant), times = 100,
                                    mtype = "prab", fixedmar="both")
 # create redundant
 f_redundant <- permute.rowsum_fixed$perm[[2]]
-#row_sum <- apply(f_redundant,1,sum) # to check if it work use the row sums and
-                                     # execute the code to above to check parity 
+# check if it works use the row sums and is.even
+row_sum <- apply(f_redundant,1,sum)
+## modulo division to find out if a number is even
+is.even <- function(x) x %% 2 == 0 
+ifelse(is.even(row_sum)==TRUE,0,1)==parity[,11] 
+# ifelse result equal target variable 
+
+
+# execute the code to above to check parity 
 # merge everything
-parity <- data.frame(parity,f_redundant)
+# parity[,11]==parity[,"target"], column of the target is 11
+parity <- data.frame(parity[,-11],f_redundant,parity[,11])
+colnames(parity) <- c("f1_irr", "f2_rel", "f3_rel" , "f4_rel", "f5_irr",
+                      "f6_rel", "f7_irr","f8_rel", "f9_irr", "f10_irr",
+                      "f11_red", "f12_red" , "f13_red", "f14_red" ,"f15_red",
+                      "target")
+# Data set has two optimal Subset: either S = {2,3,4,6,8} or S={11,12,13,14,15}
+# mixture should not be optimal 
 
 ######################### Toy Data Sets ####################################
 #
@@ -117,7 +131,7 @@ parity <- data.frame(parity,f_redundant)
 # additionally we add weakly important features
 # contiuos features
 #
-# used in Weston et al. (2003) to test FS for SVM and 
+# linear problem used in Weston et al. (2003) to test FS for SVM and 
 # in Genauer et al. (2010) to test Random Forrest Variable Importance
 # cite both papers!
 
@@ -147,17 +161,17 @@ toy.data <- function(n=200,p=100, balance=0.6,strong.corr=0.7){
   f_noise <- replicate(p-6, rnorm(n,mean=0,sd=1))
   
   ### combining the data
-  toy.data <- data.frame(f_noise,target,f_strong,f_weak)
-  colnames(toy.data) <- c(as.character(1:(p-6)),"target","f1_strong","f2_strong","f3_strong","f4_weak",
-                          "f5_weak", "f6_weak")
+  toy.data <- data.frame(f_noise,f_strong,f_weak,target)
+  colnames(toy.data) <- c(as.character(1:(p-6)),"f1_strong","f2_strong","f3_strong","f4_weak",
+                          "f5_weak", "f6_weak","target")
   return(toy.data)
 }
 
 ### set up different data sets
 set.seed(12345)
-toy.data1 <- toy.data(n=1000,p=200) # normal structure
-toy.data2 <- toy.data(n=1000,p=600) # n=p for the training
-toy.data3 <- toy.data(n=200,p=500)  # p>>n 
+toy.data1 <- toy.data(n=500,p=100)  # normal structure
+toy.data2 <- toy.data(n=500,p=500)  # n=p, high dimensional by also high sample size 
+toy.data3 <- toy.data(n=100,p=500)  # p>>n 
 
 # R_relevant <- cor(toy.data1[,(201-6):201])
 
@@ -185,11 +199,17 @@ monk.tr <- monk.tr[,-1]
 idx.tr <- which(monk[,8] %in% monk.tr[,8]) 
 monk.test <- monk[-idx.tr,]
 
+# change the column of the target and lose id variable
+# note target is in column 1
+monk <- data.frame(monk[,2:7],monk[,1])
+monk.tr <- data.frame(monk.tr[,2:7],monk.tr[,1])
+
+
 ## names columns
 # features f2, f3, f5 are relevant, but selecting only f2 and f5 can lead to better
 # classification result (see John & Kohavi, 1997)
-col.monk <- c("target", "f1_irr", "f2_rel", "f3_irr" , "f4_rel", 
-                       "f5_rel", "f6_irr", "id")
+col.monk <- c("f1_irr", "f2_rel", "f3_irr" , "f4_rel", 
+                       "f5_rel", "f6_irr", "target")
 colnames(monk.tr) <- colnames(monk.test) <- colnames(monk) <- col.monk
 
 ############################ MADELON ###########################################
@@ -225,7 +245,7 @@ rm(f_irrelevant, f_redundant, f_relevant,madelon.tr,
    madelon.tr_labels, madelon.val, madelon.val_labels, target,
    f1, f2, idx.tr, col.monk,permute.rowsum_fixed, R_xor)
 
-
+setwd("C:/Users/Dennis/Documents/GitHub/is-seminar/")
 
 
 
