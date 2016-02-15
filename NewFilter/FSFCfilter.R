@@ -1,5 +1,9 @@
-################### Functions to implement the FSFC from Liu et al. (2014)
+##### Feature Selection algorithm based on inFormation Criteria (FSFC)
 #
+#
+# requires infoTheo and loadPackages to estimate Information theoretic quantities
+source("NewFilter/InfoTheo.R") # to estimate Mututal Information and Symmetrical Uncertainty
+# Filter proposed by Liu et al. (2014)
 # Basic Idea: To measure relevance and redudancy the mutual Information criteria 
 #             and coefficient of relevance CR(X,Y) = I(X;Y)/H(X) are used.
 #             The algoritm works in a similar way as a algglomerative 
@@ -15,40 +19,39 @@
 # S_b(C,s) = sum(I(C;s)), S_w(S) = sum(CR(s;S)), S_w(f) = sum(CR(s;f))
 #
 FSFC.evaluation <- function(allFeatures,candidateFeatures,
-                            choosenFeatures,target,MI_fc){
+                            choosenFeatures,target,I_fc,I_full){
   
   ### S_b(S,C) = sum of all I(s;C)
   # caculate I(s;C) for all feature s in the subset S
-  I_sC <- rep(0,length(choosenFeatures))
-  for(i in 1:length(choosenFeatures)){
-    I_sC[i] <- mutinformation(allFeatures[,choosenFeatures[i]],
-                              target, method="emp")
-  }#end for
-  
-  # take the sum
-  S_b <- sum(I_sC)
+  ## I(s;C) is included in I_full therefore we do not need to calculate it again
+  # just elements of all choosenFeatures in I_full and take the sum
+  S_b <- sum(I_full[choosenFeatures])
   
   ### S_w(S) = sum of all I(s;S)/H(S)   
   # calculate CR(s,S)=I(S;s)/H(S)
+  # I(s;S) = H(s) + H(S) - H(s;S) --> H(S) is fixed so use MI.fast
+  entropy.S <- entropy(allFeatures[,choosenFeatures],method="emp")
   CR_sS <- rep(0,length(choosenFeatures))
   for(i in 1:length(choosenFeatures)){
-    CR_sS[i] <- mutinformation(allFeatures[,choosenFeatures[i]],
-                               allFeatures[,choosenFeatures],method="emp")/
+    CR_sS[i] <- MI.fast(x=allFeatures[,choosenFeatures[i]],
+                        y=allFeatures[,choosenFeatures],
+                        entropy.y=entropy.S)/
       entropy(allFeatures[,choosenFeatures], method="emp")
   }#end for
   
   # take the sum
   S_wS <- sum(CR_sS)
   
-  ### Calculate S_(F) = sum(I(s;f)/H(f)) for all candidate features
-  # an length(candidateFeature) x length(choosenFeatures)-Matrix with zero
+  ### Calculate S_w(f) = sum(I(s;f)/H(f)) for all candidate features
+  # a length(candidateFeature) x length(choosenFeatures)-Matrix with zeros
   CR_sf <- matrix(rep(0,length(candidateFeatures)*length(choosenFeatures)),
                   nrow=length(candidateFeatures),ncol=length(choosenFeatures))
   # for each candidate Feature not already choosen
   for(i in length(candidateFeatures)){
     # for each choosen Feature in the choosen Subset
     for(j in 1:length(choosenFeatures)){
-      CR_sf[i,j] <- mutinformation(candidateFeatures[,i],allFeatures[,choosenFeatures[j]], 
+      CR_sf[i,j] <- mutinformation(candidateFeatures[,i],
+                                   allFeatures[,choosenFeatures[j]], 
                                  method="emp")/ entropy(candidateFeatures[,i])  
     }#end inner for(j)
   }#end outer for(i)
@@ -62,7 +65,7 @@ FSFC.evaluation <- function(allFeatures,candidateFeatures,
   }#end if else
   
   ## Calculate the final measure
-  J <- (S_b + MI_fc)/(length(choosenFeatures) + S_wS + S_wf)
+  J <- (S_b + I_fc)/(length(choosenFeatures) + S_wS + S_wf)
   return(J)
 }# FSFC.evaluation
 
@@ -80,41 +83,44 @@ fsfc <- function(target,features,K=ceiling(ncol(features)*0.1)){
   ############ First Round ######################################
   # first feature is choosen by the mutual information criteria exclusively
   #
-  #### Caculate I(f;C) for all features
-  MI_fc <- c(rep(0,ncol(features)))
+  #### Caculate I(f;C) for all features using MI.fast
+  entropy.target <- entropy(target,method="emp")
+  I_fc <- c(rep(0,ncol(features)))
   for(i in 1:ncol(features)){
-    MI_fc[i] <- mutinformation(features[,i], target, method="emp")
+    I_fc[i] <- MI.fast(x=features[,i],y=target,entropy.y=entropy.target)
   }
   ## get the feature with the highest I(f;C)
-  S_b <- data.frame(MI_fc)
   # make sure feature names stay 
-  rownames(S_b) <- colnames(features) 
+  names(I_fc) <- colnames(features) 
   # cutoff best feature
-  choosenFeatures <- cutoff.k(S_b,k=1) 
+  choosenFeatures <- cutoff.k(data.frame(I_fc),k=1) 
   ## get the index of the choosen Feature
   idx.choosen <- which(colnames(features) %in% choosenFeatures) 
   # new candidate feature excluding the feature choosen
   candidateFeatures <- features[,-idx.choosen]
+  # save all I(f;C) as I_full to use it later! This avoid a one loop in the 
+  # calculation of FSFC.evaluation since we need the I(subset;C) to calculate this
+  I_full <- I_fc
   # exclude the choosen feature form the vector of I(f;C)
-  MI_fc <- MI_fc[-idx.choosen]
+  I_fc <- I_fc[-idx.choosen]
   
   # set stopping parameters for while loop
   k <- 1; K <- K
   # while k<K do:
   while(k<K){
-    ## Calculate J(f) for evaluating features
-    J_f <- data.frame(FSFC.evaluation(features,candidateFeatures,choosenFeatures,
-                                      target,MI_fc))
+  ## Calculate J(f) for evaluating features
+    J_f <- FSFC.evaluation(features,candidateFeatures,choosenFeatures,target,
+                           I_fc,I_full)
     # retain row names for output
-    rownames(J_f) <- colnames(candidateFeatures) 
+    names(J_f) <- colnames(candidateFeatures) 
     # choose best feature according to J_f
-    choosenFeatures <- c(choosenFeatures,cutoff.k(J_f,k=1))
+    choosenFeatures <- c(choosenFeatures,cutoff.k(data.frame(J_f),k=1))
     # get the index of the choosen feature
     idx.choosen <- which(colnames(candidateFeatures) %in% choosenFeatures)
     # remove choosen feature from the candidate features list
     candidateFeatures <- candidateFeatures[,-idx.choosen]
     # remove the row of I(f,C) for the choosen features
-    MI_fc <- MI_fc[-idx.choosen]
+    I_fc <- I_fc[-idx.choosen]
     # add one to k
     k <- k + 1
   }#end while  
@@ -124,9 +130,10 @@ fsfc <- function(target,features,K=ceiling(ncol(features)*0.1)){
 
 #### some tests
 #fsfc(target=monk.tr[,"target"],features=monk.tr[,-c(1,8)],K=3)
-#fsfc(target=corral_100.tr[,"target"],features=corral_100.tr[,-100], K=6)
-#fsfc(target=parity.tr[,"target"],features=parity.tr[,-11], K=6)
-#fsfc(target=xor_100.tr[,"target"],features=xor_100.tr[,-98], K=6)
+#system.time(fsfc(target=corral_100[,"target"],features=corral_100[,-100], K=50))
+#fsfc(target=parity[,"target"],features=parity[,-11], K=6)
+#fsfc(target=xor_100[,"target"],features=xor_100[,-98], K=6)
+
 
 
 
