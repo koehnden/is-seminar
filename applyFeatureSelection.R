@@ -83,13 +83,13 @@ applyFS <- function(data, discrete.data=T, cutoff.percent=0.1){
 }#end apply FS 
 
 ### apply all filter to the data sets
-corral.fs <- applyFS(data=corral_100)
-xor.fs <- applyFS(data=xor_100)
-monk.fs <- applyFS(data=monk.tr[,-8], cutoff.percent=0.5) # exclude id (-8)
-parity.fs <- applyFS(data=parity, cutoff.percent=0.5) 
-toy1.fs <- applyFS(data=toy.data1,discrete.data=F)
-toy2.fs <- applyFS(data=toy.data2,discrete.data=F)
-toy3.fs <- applyFS(data=toy.data3,discrete.data=F)
+#corral.fs <- applyFS(data=corral_100)
+#xor.fs <- applyFS(data=xor_100)
+#monk.fs <- applyFS(data=monk.tr[,-8], cutoff.percent=0.5) # exclude id (-8)
+#parity.fs <- applyFS(data=parity, cutoff.percent=0.5) 
+#toy1.fs <- applyFS(data=toy.data1,discrete.data=F)#
+#toy2.fs <- applyFS(data=toy.data2,discrete.data=F)
+#toy3.fs <- applyFS(data=toy.data3,discrete.data=F)
 
 
 

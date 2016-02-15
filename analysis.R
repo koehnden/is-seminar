@@ -2,7 +2,7 @@
 source("LoadPackages.R")
 
 # load up the datasets and filter, performance functions
-source("IWFSfunction.R")
+source("applyFeatureSelection.R")
 source("LoadArtificialData.R")
 source("LoadRealData.R")
 source("performance.R")
@@ -12,23 +12,24 @@ datasets <- list(corral,corral_100,xor,xor_100,parity,toy,data1,toy.data2,toy.da
 
 # Assumptions: Last variable of the dataset is the target variable
 
-#################### IWFS Algorithm ##############################################
-# Select the features
-selectedFeaturesIWFS <- fsSelectCustom(datasets,iwfs)
-# Train the models and get the performance
-performanceIWFS <- fsPerformance(datasets,selectedFeaturesIWFS)
+#################### Analysis ##############################################
+resultsSelectedFeatures <- list()
+resultsPerformance <- list()
 
+# Loop selects the target variable, selects the features
+for (i in c(1:2)) {
 
-################### CFS Algorithm ################################################
-# Select the features
-selectedFeaturesCFS <- fsSelectCustom(datasets,cfs)
-# Train the models and get the performance
-performanceCFS <- fsPerformance(datasets,selectedFeaturesCFS)
-
-################## Relief-F Algorithm ############################################
-# Select the features
-selectedFeaturesRELIEF <- fsSelectCustom(datasets,relief)
-# Train the models and get the performance
-performanceRELIEF <- fsPerformance(datasets,selectedFeaturesRELIEF)
-
-################# Basic Caret functions #########################################
+  d <- datasets[i]
+  selectedFeatures <- applyFS(d)
+  resultsSelectedFeatures[i] <- selectedFeatures
+  
+  # Performance
+  for (j in c(1:length(selectedFeatures))) {
+    targetVariable <- d[,ncol(c)]
+    d <- d[,1:ncol(d)-1]
+    
+    performance <- modelPerformance(d[,names(d) %in% selectedFeatures[j]],targetVariable)
+    resultsSelectedFeatures[j] <- performance
+  }
+  
+}

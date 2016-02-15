@@ -1,33 +1,13 @@
-###### Wrapper function for custom written algorithms #######################
-fsSelectCustom <- function(datasets=NULL,fsAlgo=NULL){
-  set.seed(800)
-  results <- list()
-  
-  # Loop selects the target variable, selects the features
-  for (i in c(1:length(datasets))) {
-    d <- datasets[i]
-    targetVariable <- d[,ncol(c)]
-    d <- d[,1:ncol(d)-1]
-    selectedFeatures <- fsAlgo(targetVariable,d)
-    
-    results[i] <- selectedFeatures
-  }
-  
-  names(results) <- colnames(datasets)
-  return(results)
-}
-
+source("applyFeatureSelection.R")
 ####### Wrapper functions for algorithm from the FSelect package, different from the Custom packages due to the formula interface ##########
-fsSelectFSelector <- function(datasets=NULL,fsAlgo=NULL){
+fsSelect <- function(datasets=NULL){
   set.seed(800)
   results <- list()
   
   # Loop selects the target variable, selects the features
   for (i in c(1:length(datasets))) {
     d <- datasets[i]
-    targetVariable <- d[,ncol(c)]
-    d <- d[,1:ncol(d)-1]
-    selectedFeatures <- fsAlgo(targetVariable~.,d)
+    selectedFeatures <- applyFS(d)
     
     results[i] <- selectedFeatures
   }
@@ -39,7 +19,6 @@ fsSelectFSelector <- function(datasets=NULL,fsAlgo=NULL){
 ####### Test the performance of a dataset given a set of selected features #########################
 fsPerformance <- function(datasets=NULL,selectedFeatures=NULL){
   set.seed(800)
-  fitControl <- trainControl(method = "cv",number = 5, allowParallel=T, summaryFunction = twoClassSummary,classProbs = TRUE)
   
   results <- list()
   
@@ -59,6 +38,8 @@ fsPerformance <- function(datasets=NULL,selectedFeatures=NULL){
 
 #### Wrapper for all the models ###############################
 modelPerformance <- function(dataset=NULL,targetVariable=NULL){
+  fitControl <- trainControl(method = "cv",number = 5, allowParallel=T, summaryFunction = twoClassSummary,classProbs = TRUE)
+  
   # Gradient Boosting
   xgbFit <- train(targetVariable ~ ., data = dataset ,method = "xgbTree",trControl = fitControl,verbose=TRUE, metric="ROC")
   # Random Forest
