@@ -1,5 +1,5 @@
 source("applyFeatureSelection.R")
-####### Wrapper functions for algorithm from the FSelect package, different from the Custom packages due to the formula interface ##########
+####### Wrapper functions for algor(ithm from the FSelect package, different from the Custom packages due to the formula interface ##########
 fsSelect <- function(datasets=NULL){
   set.seed(800)
   results <- list()
@@ -37,17 +37,29 @@ fsPerformance <- function(datasets=NULL,selectedFeatures=NULL){
 }
 
 #### Wrapper for all the models ###############################
-modelPerformance <- function(dataset=NULL,targetVariable=NULL){
-  fitControl <- trainControl(method = "cv",number = 5, allowParallel=T, summaryFunction = twoClassSummary,classProbs = TRUE)
-  
+modelPerformance <- function(dataset=NULL,targetVariable=NULL,linear=T){
+  fitControl <- trainControl(method = "cv",number = 10, allowParallel=T, 
+                             summaryFunction = twoClassSummary,classProbs = TRUE)  
   # Gradient Boosting
-  xgbFit <- train(targetVariable ~ ., data = dataset ,method = "xgbTree",trControl = fitControl,verbose=TRUE, metric="ROC")
+  xgbFit <- train(targetVariable~., data = dataset,method="gbm",
+                  trControl=fitControl,metric="ROC")
   # Random Forest
-  rfFit <- train(targetVariable ~ ., data = dataset ,method = "rfTree",trControl = fitControl,verbose=TRUE, metric="ROC")
+  rfFit <- train(targetVariable~., data = dataset ,method = "rf",
+                 trControl = fitControl, metric="ROC")
   # Neural Net
-  nnFit <- train(targetVariable ~ ., data = dataset ,method = "nnet",trControl = fitControl,verbose=TRUE, metric="ROC")
-  # SVM
-  svmFit <- train(targetVariable ~ ., data = dataset ,method = "svmLinear",trControl = fitControl,verbose=TRUE, metric="ROC")
+  nnFit <- train(targetVariable ~ ., data = dataset ,method = "nnet",
+                 trControl = fitControl, metric="ROC")
   
+  if(linear==F){
+    # Non-linear with radial kernel
+    svmFit <- train(targetVariable ~ ., data = dataset ,
+                    method="svmRadial",trControl = fitControl, metric="ROC")
+    
+  } else {
+    # SVM with linear kernel
+    svmFit <- train(targetVariable ~ ., data = dataset ,method = "svmLinear",
+                    trControl = fitControl, metric="ROC")  
+  }#if else
   return(list(xgbFit,rfFit,nnFit,svmFit))
+  #return(list(svmFit))
 }
